@@ -5,6 +5,11 @@ import { input, select } from "@inquirer/prompts";
 
 export class Logger {
   data: Goal[];
+  goal: Goal | null = null;
+  block: Block | null = null;
+  day: Day | null = null;
+  workout: Workout | null = null;
+  exercise: Exercise | null = null;
 
   constructor(data: Goal[]) {
     this.data = data;
@@ -57,8 +62,8 @@ export class Logger {
     );
   }
 
-  async askForBlockByName(goal: Goal): Promise<number | undefined> {
-    const blockChoices = goal.blocks.map((block, index) => ({
+  async askForBlockByName(): Promise<number | undefined> {
+    const blockChoices = this.goal!.blocks.map((block, index) => ({
       name: block.name,
       value: index,
     }));
@@ -67,7 +72,7 @@ export class Logger {
       choices: [...blockChoices, { name: "Create New Block", value: -1 }], // Add option to create a new block
     });
     if (answer === -1) {
-      await this.handleNewBlock(goal);
+      await this.handleNewBlock(this.goal!);
       return undefined;
     }
     return answer as number;
@@ -87,8 +92,8 @@ export class Logger {
     );
   }
 
-  async askForDayByName(block: Block): Promise<number | undefined> {
-    const dayChoices = block.days.map((day, index) => ({
+  async askForDayByName(): Promise<number | undefined> {
+    const dayChoices = this.block!.days.map((day, index) => ({
       name: day.name,
       value: index,
     }));
@@ -97,7 +102,7 @@ export class Logger {
       choices: [...dayChoices, { name: "Create New Day", value: -1 }], // Add option to create a new day
     });
     if (answer === -1) {
-      await this.handleNewDay(block);
+      await this.handleNewDay(this.block!);
       return undefined;
     }
     return answer as number;
@@ -119,8 +124,8 @@ export class Logger {
     );
   }
 
-  async askForWorkoutByName(day: Day): Promise<number | undefined> {
-    const workoutChoices = day.workout.map((workout, index) => ({
+  async askForWorkoutByName(): Promise<number | undefined> {
+    const workoutChoices = this.day!.workout.map((workout, index) => ({
       name: workout.name,
       value: index,
     }));
@@ -129,7 +134,7 @@ export class Logger {
       choices: [...workoutChoices, { name: "Create New Workout", value: -1 }], // Add option to create a new workout
     });
     if (answer === -1) {
-      await this.handleNewWorkout(day);
+      await this.handleNewWorkout(this.day!);
       return undefined; // New workout was created, no need to proceed further
     }
     return answer as number;
@@ -173,8 +178,8 @@ export class Logger {
     );
   }
 
-  async askForExerciseByName(workout: Workout): Promise<number | undefined> {
-    const exerciseChoices = workout.exercises.map((exercise, index) => ({
+  async askForExerciseByName(): Promise<number | undefined> {
+    const exerciseChoices = this.workout!.exercises.map((exercise, index) => ({
       name: exercise.name,
       value: index,
     }));
@@ -183,7 +188,7 @@ export class Logger {
       choices: [...exerciseChoices, { name: "Create New Exercise", value: -1 }], // Add option to create a new exercise
     });
     if (answer === -1) {
-      await this.handleNewExercise(workout);
+      await this.handleNewExercise(this.workout!);
       return undefined; // New exercise was created, no need to proceed further
     }
     return answer as number;
@@ -227,34 +232,33 @@ export class Logger {
     if (!goal) {
       return; // New goal was created, no need to proceed further
     }
+    this.goal = goal;
 
-    const blockIndex = await this.askForBlockByName(goal);
+    const blockIndex = await this.askForBlockByName();
     if (blockIndex === undefined) {
       return; // New block was created, no need to proceed further
     }
+    this.block = this.goal.blocks[blockIndex] as Block;
 
-    const block = goal.blocks[blockIndex] as Block;
-
-    const dayIndex = await this.askForDayByName(block);
+    const dayIndex = await this.askForDayByName();
     if (dayIndex === undefined) {
       return; // New day was created, no need to proceed further
     }
+    this.day = this.block.days[dayIndex] as Day;
 
-    const day = block.days[dayIndex] as Day;
-
-    const workoutIndex = await this.askForWorkoutByName(day);
+    const workoutIndex = await this.askForWorkoutByName();
     if (workoutIndex === undefined) {
       return; // New workout was created, no need to proceed further
     }
+    this.workout = this.day.workout[workoutIndex] as Workout;
 
-    const workout = day.workout[workoutIndex] as Workout;
-
-    const exerciseIndex = await this.askForExerciseByName(workout);
+    const exerciseIndex = await this.askForExerciseByName();
     if (exerciseIndex === undefined) {
       return; // New exercise was created, no need to proceed further
     }
 
-    const exercise = workout.exercises[exerciseIndex] as Exercise;
+    const exercise = this.workout.exercises[exerciseIndex] as Exercise;
+    this.exercise = exercise;
 
     await this.setRecord(exercise);
 
