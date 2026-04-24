@@ -33,7 +33,5 @@ export interface Exercise {
 }
 
 export interface Record {
-  weight: number; // Weight lifted in kg
-  reps: number; // Number of repetitions performed
-  notes?: string; // Optional notes about the workout session
+  weight: number | string; // Weight lifted in kg
 }
