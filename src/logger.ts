@@ -9,6 +9,7 @@ const SELECTION_STATUS = {
   SELECTED: "Selected",
   CREATE_NEW: "Create New",
   OVERWRITE: "Overwrite",
+  IMPORTED_EXERCISES: "Imported Exercises",
 } as const;
 
 interface SelectionResult<T> {
@@ -57,6 +58,7 @@ export class Logger {
       default: this.goal
         ? goalChoices.find((choice) => choice.name === this.goal!.goal)?.value
         : undefined,
+      loop: false, // Disable looping to prevent going back to the first option after reaching the end of the list
     });
     if (answer === SELECTION_STATUS.CREATE_NEW) {
       await this.handleNewGoal();
@@ -105,6 +107,7 @@ export class Logger {
       default: this.block
         ? blockChoices.find((choice) => choice.name === this.block!.name)?.value
         : undefined,
+      loop: false, // Disable looping to prevent going back to the first option after reaching the end of the list
     });
     if (answer === SELECTION_STATUS.CREATE_NEW) {
       await this.handleNewBlock(this.goal!);
@@ -172,6 +175,7 @@ export class Logger {
       default: this.day
         ? dayChoices.find((choice) => choice.name === this.day!.name)?.value
         : undefined,
+      loop: false, // Disable looping to prevent going back to the first option after reaching the end of the list
     });
     if (answer === SELECTION_STATUS.CREATE_NEW) {
       await this.handleNewDay(this.block!);
@@ -219,6 +223,7 @@ export class Logger {
         ? workoutChoices.find((choice) => choice.name === this.workout!.name)
             ?.value
         : undefined,
+      loop: false, // Disable looping to prevent going back to the first option after reaching the end of the list
     });
     if (answer === SELECTION_STATUS.CREATE_NEW) {
       await this.handleNewWorkout(this.day!);
@@ -276,6 +281,49 @@ export class Logger {
       name: exercise.name,
       value: index,
     })) as { name: string; value: number | string }[];
+
+    // Check if there ane any exercises in sibling workouts to suggest as defaults
+    const siblingExercises = this.day!.workout.filter((w) => w !== this.workout) // Get sibling workouts
+      .flatMap((w) => w.exercises) // Get exercises from sibling workouts
+      .map((exercise) => ({
+        name: exercise.name,
+        description: exercise.description,
+        sets: exercise.sets,
+        reps: exercise.reps,
+      })); // Get exercise names
+
+    const uniqueSiblingExercises = Array.from(new Set(siblingExercises)); // Get unique exercise names
+
+    if (uniqueSiblingExercises.length > 0 && exerciseChoices.length === 0) {
+      const askToImport = await select({
+        message: "Would you like to import exercises from sibling workouts?",
+        choices: [
+          { name: "Yes, import exercises", value: true },
+          { name: "No, create a new exercise", value: false },
+        ],
+      });
+      if (askToImport) {
+        // If user wants to import, we can add the sibling exercises to the current workout and set the first one as default
+        uniqueSiblingExercises.forEach((exercise) => {
+          // Check if the exercise already exists in the current workout to avoid duplicates
+          if (!this.workout!.exercises.some((e) => e.name === exercise.name)) {
+            this.workout!.exercises.push({
+              name: exercise.name,
+              description: exercise.description,
+              sets: exercise.sets,
+              reps: exercise.reps,
+              records: [],
+            });
+          }
+        });
+
+        return {
+          status: SELECTION_STATUS.IMPORTED_EXERCISES,
+          value: null,
+        };
+      }
+    }
+
     const answer = await select({
       message: `Select the exercise to add to for "${this.workout!.name}" at "${this.day!.name}" on "${this.block!.name}" in "${this.goal!.goal}":`,
       choices: [
@@ -288,6 +336,7 @@ export class Logger {
         ? exerciseChoices.find((choice) => choice.name === this.exercise!.name)
             ?.value
         : undefined,
+      loop: false, // Disable looping to prevent going back to the first option after reaching the end of the list
     });
     if (answer === SELECTION_STATUS.CREATE_NEW) {
       await this.handleNewExercise(this.workout!);
@@ -405,6 +454,10 @@ export class Logger {
         if (exerciseIndex.status === SELECTION_STATUS.EXIT) {
           running = false; // User chose to exit, break the loop
           continue;
+        }
+
+        if (exerciseIndex.status === SELECTION_STATUS.IMPORTED_EXERCISES) {
+          continue; // After importing exercises, prompt the user to select an exercise to set records for
         }
 
         const exercise = this.workout!.exercises[
